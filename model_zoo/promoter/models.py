@@ -169,7 +169,7 @@ def load_trained_model(checkpoint_path: str, config: DictConfig, architecture: s
     print(f"Loading checkpoint: {checkpoint_path}")
     
     # Load checkpoint
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
     
     # Handle different checkpoint formats
     if checkpoint_path.endswith('.ckpt'):

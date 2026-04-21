@@ -195,7 +195,8 @@ def main():
     else:
         results = {
             'num_sequences': len(sequences),
-            'sequence_length': seq_length
+            'sequence_length': seq_length,
+            'res_sequences': sequences
         }
     
     # Save elements if requested

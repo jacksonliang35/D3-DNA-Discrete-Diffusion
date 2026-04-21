@@ -184,18 +184,14 @@ class GibbsCorrector:
 
         for _ in range(csteps):
             sampling_prob = score / torch.sum(score, dim=-1, keepdim=True)
-            print(sampling_prob.shape)
 
             # probability assigned to the current token
-            p_cur = sampling_prob.gather(2, x.unsqueeze(-1)).squeeze(1)            # (B,D)
-            print(p_cur.shape)
+            p_cur = sampling_prob.gather(2, x.unsqueeze(-1)).squeeze(-1)            # (B,D)
 
             # decide whether to resample
             do_resample = p_cur < thr                                             # (B,D) bool
-            print(do_resample.shape)
 
             proposed = sample_categorical(sampling_prob)                          # (B,D)
-            print(proposed.shape)
             
             x = torch.where(do_resample, proposed, x)                             # (B,D)
 

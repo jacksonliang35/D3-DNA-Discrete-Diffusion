@@ -167,8 +167,9 @@ class BaseSampler:
                     torch.cuda.empty_cache()
                 if save_elements_list:
                     return sampled_sequences, processed_elements
-            # Move sequences to CPU even if no saved elements
-            sampled_sequences = sampled_sequences.cpu()
+            else:
+                # Move sequences to CPU even if no saved elements
+                sampled_sequences = result.cpu()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
             if save_elements_list:

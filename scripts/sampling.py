@@ -2,6 +2,7 @@ import abc
 import torch
 import torch.nn.functional as F
 from utils.catsample import sample_categorical
+from tqdm import tqdm
 
 from utils.utils import get_score_fn
 
@@ -233,7 +234,6 @@ def get_pc_sampler(graph, noise, batch_dims, predictor, steps, denoise=True, eps
         if saved_elements and 'sequence' in saved_elements:
             saved_elements['sequence'].append(x.clone())
 
-        from tqdm import tqdm
         for i in tqdm(range(steps), total=steps, desc="Diffusion Steps"):
             t = timesteps[i] * torch.ones(x.shape[0], 1, device=device)
             x = projector(x)

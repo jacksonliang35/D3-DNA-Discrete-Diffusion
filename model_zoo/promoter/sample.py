@@ -196,7 +196,7 @@ def main():
         results = {
             'num_sequences': len(sequences),
             'sequence_length': seq_length,
-            'res_sequences': sequences
+            'res_sequences': torch.argmax(sequences, dim=-1)
         }
     
     # Save elements if requested

@@ -80,7 +80,8 @@ class BaseEvaluator:
     
     def sample_sequences_for_evaluation(self, checkpoint_path: str, config: OmegaConf, 
                                        dataloader, num_steps: int, architecture: str = 'transformer', 
-                                       show_progress: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
+                                        gibbs: bool = False, csteps: int = 1, cdiv: int = 1, ctype: str = 'sys',
+                                        thr: float = 0.1, show_progress: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Sample sequences for evaluation using PC sampler.
         
@@ -108,9 +109,15 @@ class BaseEvaluator:
         batch_size = dataloader.batch_size
         
         # Create PC sampler once (will be reused for all batches)
-        sampling_fn = sampling.get_pc_sampler(
-            graph, noise, (batch_size, sequence_length), 'analytic', num_steps, device=self.device
-        )
+        if gibbs:
+            sampling_fn = sampling.get_gibbs_sampler(
+                graph, noise, (batch_size, sequence_length), 'analytic', num_steps, 
+                csteps=csteps, cdiv=cdiv, ctype=ctype, thr=thr, device=self.device
+            )
+        else:
+            sampling_fn = sampling.get_pc_sampler(
+                graph, noise, (batch_size, sequence_length), 'analytic', num_steps, device=self.device
+            )
         
         sampled_sequences = []
         all_targets = []
@@ -124,9 +131,15 @@ class BaseEvaluator:
             
             # If last batch has different size, create new sampling function
             if current_batch_size != batch_size:
-                sampling_fn = sampling.get_pc_sampler(
-                    graph, noise, (current_batch_size, sequence_length), 'analytic', num_steps, device=self.device
-                )
+                if gibbs:
+                    sampling_fn = sampling.get_gibbs_sampler(
+                        graph, noise, (current_batch_size, sequence_length), 'analytic', num_steps, 
+                        csteps=csteps, cdiv=cdiv, ctype=ctype, thr=thr, device=self.device
+                    )
+                else:
+                    sampling_fn = sampling.get_pc_sampler(
+                        graph, noise, (current_batch_size, sequence_length), 'analytic', num_steps, device=self.device
+                    )
             
             # Sample sequences conditioned on targets
             sample = sampling_fn(model, targets.to(self.device))

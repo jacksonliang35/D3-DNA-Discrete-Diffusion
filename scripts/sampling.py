@@ -285,6 +285,7 @@ def get_gibbs_sampler(graph, noise, batch_dims, predictor, steps, denoise=True, 
         x = graph.sample_limit(*batch_dims).to(device)
 
         num_steps = steps * (cdiv // (cdiv+1))   # in order to match the NFE
+        print(num_steps, cdiv)
         timesteps = torch.linspace(1, eps, num_steps + 1, device=device)
         dt = (1 - eps) / num_steps
 

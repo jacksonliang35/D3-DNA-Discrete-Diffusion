@@ -278,7 +278,7 @@ class BaseEvaluator:
         print(f"Sampling sequences with PC sampler ({steps} steps)...")
         sampled_sequences, target_labels = self.sample_sequences_for_evaluation(
             checkpoint_path, config, dataloader, steps, architecture,
-            gibbs, csteps, cdiv, ctype, thr, how_progress
+            gibbs, csteps, cdiv, ctype, thr, show_progress
         )
 
         # Save sequences as NPZ if requested

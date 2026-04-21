@@ -209,6 +209,8 @@ def load_trained_model(checkpoint_path: str, config: DictConfig, architecture: s
         
         if 'ema' in checkpoint:
             ema.load_state_dict(checkpoint['ema'])
+            if ema.shadow_params[0].shape[0] == 1:
+                del ema.shadow_params[0]
             print("✓ Loaded EMA weights from original checkpoint")
     
     # Apply EMA weights to model

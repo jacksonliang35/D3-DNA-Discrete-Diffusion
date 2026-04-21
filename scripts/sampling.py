@@ -291,7 +291,7 @@ def get_gibbs_sampler(graph, noise, batch_dims, predictor, steps, denoise=True, 
             t = timesteps[i] * torch.ones(x.shape[0], 1, device=device)
             x = proj_fun(x)
             x = predictor.update_fn(score_fn, x, labels, t, dt)
-            if i % div == 0:
+            if i % cdiv == 0:
                 if ctype == 'random':
                     x = corrector.update_fn_rand(score_fn, x, labels, t, csteps=csteps, thr=thr)
                 elif ctype == 'sys':

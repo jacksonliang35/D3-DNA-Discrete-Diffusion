@@ -94,7 +94,7 @@ class PromoterEvaluator(BaseEvaluator):
             
             # Load checkpoint if provided
             if oracle_checkpoint and os.path.exists(oracle_checkpoint):
-                checkpoint = torch.load(oracle_checkpoint, map_location=self.device)
+                checkpoint = torch.load(oracle_checkpoint, map_location=self.device, weights_only=False)
                 state_dict = upgrade_state_dict(checkpoint['state_dict'], prefixes=['module.'])
                 oracle.load_state_dict(state_dict, strict=False)
             

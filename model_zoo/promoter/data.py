@@ -72,6 +72,8 @@ class PromoterDataset(Dataset):
         return X, label
     
     def __len__(self) -> int:
+        if self.split == 'test':
+            return len(self.X) // 30
         return len(self.X)
     
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:

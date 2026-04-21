@@ -42,27 +42,27 @@ def upgrade_state_dict(state_dict, prefixes):
 
 class PromoterEvaluator(BaseEvaluator):
     """Promoter-specific evaluator that inherits from base framework."""
-    
+
     def __init__(self):
         super().__init__("Promoter")
-    
+
     def load_model(self, checkpoint_path: str, config: OmegaConf, architecture: str = 'transformer'):
         """Load Promoter model using dataset-specific model loading."""
         from model_zoo.promoter.models import load_trained_model
-        
+
         return load_trained_model(checkpoint_path, config, architecture, self.device)
-    
+
     def get_sequence_length(self, config: OmegaConf) -> int:
         """Get Promoter sequence length."""
         if hasattr(config, 'model') and hasattr(config.model, 'length'):
             return config.model.length
         return 1024  # Promoter default sequence length
-    
+
     def create_dataloader(self, config: OmegaConf, split: str = 'test', batch_size: Optional[int] = None):
         """Create Promoter dataloader."""
-        # Load datasets 
+        # Load datasets
         train_ds, val_ds, test_ds = get_promoter_datasets(config.paths.data_file)
-        
+
         # Select appropriate dataset
         if split == 'train':
             dataset = train_ds
@@ -72,11 +72,11 @@ class PromoterEvaluator(BaseEvaluator):
             dataset = test_ds
         else:
             raise ValueError(f"Unknown split: {split}")
-            
+
         # Use config batch size if not specified
         if batch_size is None:
             batch_size = getattr(config.eval, 'batch_size', 32)
-            
+
         return DataLoader(
             dataset,
             batch_size=batch_size,
@@ -84,40 +84,40 @@ class PromoterEvaluator(BaseEvaluator):
             num_workers=2,
             pin_memory=True
         )
-    
+
     def load_oracle_model(self, oracle_checkpoint: str, data_path: str):
         """Load Promoter oracle model (Sei)."""
         try:
             # Load Sei oracle model with proper architecture
             sei_model = Sei(4096, 21907)  # 4096 seq length, 21907 features
             oracle = NonStrandSpecific(sei_model)
-            
+
             # Load checkpoint if provided
             if oracle_checkpoint and os.path.exists(oracle_checkpoint):
                 checkpoint = torch.load(oracle_checkpoint, map_location=self.device, weights_only=False)
                 state_dict = upgrade_state_dict(checkpoint['state_dict'], prefixes=['module.'])
                 oracle.load_state_dict(state_dict, strict=False)
-            
+
             oracle.to(self.device)
             oracle.eval()
-            
+
             print("✓ Loaded Promoter oracle model (Sei)")
             return oracle
-            
+
         except Exception as e:
             print(f"Failed to load Promoter oracle model: {e}")
             return None
-    
-    def compute_sp_mse(self, sampled_sequences: torch.Tensor, oracle_model, 
+
+    def compute_sp_mse(self, sampled_sequences: torch.Tensor, oracle_model,
                        original_data: torch.Tensor) -> float:
         """
         Compute SP-MSE using Promoter SEI oracle model with proper inference pattern.
-        
+
         Args:
             sampled_sequences: Generated sequences (batch_size, seq_length, 4) one-hot
-            oracle_model: Loaded SEI oracle model 
+            oracle_model: Loaded SEI oracle model
             original_data: Original test sequences for comparison
-            
+
         Returns:
             Mean SP-MSE value
         """
@@ -129,25 +129,25 @@ class PromoterEvaluator(BaseEvaluator):
             except:
                 print("Warning: Could not load SEI features file, using all features")
                 self.sei_features = None
-        
+
         # Get oracle predictions for original and generated data using proper SEI inference
         val_score = self._get_sei_profile(original_data, oracle_model)
         val_pred_score = self._get_sei_profile(sampled_sequences, oracle_model)
-        
+
         # Compute SP-MSE
         sp_mse = (val_score - val_pred_score) ** 2
         mean_sp_mse = torch.mean(torch.tensor(sp_mse)).cpu().item()
-        
+
         return mean_sp_mse
-    
+
     def _get_sei_profile(self, seq_one_hot, oracle_model):
         """
         Get SEI profile following the proper inference pattern.
-        
+
         Args:
             seq_one_hot: One-hot encoded sequences (batch_size, seq_length, 4) or token indices (batch_size, seq_length)
             oracle_model: SEI oracle model
-            
+
         Returns:
             H3K4me3 predictions (batch_size,)
         """
@@ -155,20 +155,20 @@ class PromoterEvaluator(BaseEvaluator):
         if seq_one_hot.dim() == 2:  # Token indices (batch_size, seq_length)
             import torch.nn.functional as F
             seq_one_hot = F.one_hot(seq_one_hot.long(), num_classes=4).float()
-        
+
         B, L, K = seq_one_hot.shape
         seq_one_hot = seq_one_hot.cpu()
-        
+
         # Process in batches to avoid OOM
         batch_size = 256  # Adjust based on available memory
         all_predictions = []
-        
+
         from tqdm import tqdm
         for i in tqdm(range(0, B, batch_size), desc="Processing SEI batches"):
             end_idx = min(i + batch_size, B)
             batch_seq = seq_one_hot[i:end_idx]
             batch_B = batch_seq.shape[0]
-            
+
             # Pad sequence to 4096 length as expected by SEI
             # Add 1536 bases on each side with uniform background (0.25 for each nucleotide)
             sei_inp = torch.cat([
@@ -176,42 +176,42 @@ class PromoterEvaluator(BaseEvaluator):
                 batch_seq.transpose(1, 2),  # Convert to (batch, channels, length)
                 torch.ones((batch_B, 4, 1536)) * 0.25
             ], 2).to(self.device)  # batch_B x 4 x 4,096
-            
+
             # Get SEI predictions for this batch
             with torch.no_grad():
                 sei_out = oracle_model(sei_inp).cpu().detach().numpy()  # batch_B x 21,907
-            
+
             # Filter for H3K4me3 features if SEI features are available
             if self.sei_features is not None:
                 h3k4me3_mask = self.sei_features[1].str.strip().values == 'H3K4me3'
                 sei_out = sei_out[:, h3k4me3_mask]  # batch_B x 2,350 (H3K4me3 features)
-            
+
             # Take mean across H3K4me3 features for this batch
             batch_pred = sei_out.mean(axis=1)  # batch_B
             all_predictions.append(batch_pred)
-        
+
         # Concatenate all batch predictions
         import numpy as np
         predh3k4me3 = np.concatenate(all_predictions, axis=0)  # B
-        
+
         return predh3k4me3
-    
+
     def get_original_test_data(self, data_path: str) -> torch.Tensor:
         """Get original test data for SP-MSE comparison."""
         try:
             # Load Promoter test data
             _, _, test_ds = get_promoter_datasets(data_path)
-            
+
             # Return all test sequences to match the number of sampled sequences
             dataloader = DataLoader(test_ds, batch_size=len(test_ds), shuffle=False)
             batch = next(iter(dataloader))
-            
+
             if len(batch) == 2:
                 sequences, _ = batch
                 return sequences
             else:
                 return batch
-                
+
         except Exception as e:
             print(f"Error loading original test data: {e}")
             # Return dummy data as fallback
@@ -231,7 +231,7 @@ def main():
     # Parse arguments using base framework
     parser = parse_base_args()
     args = parser.parse_args()
-    
+
     # Validate required arguments for evaluation
     if not args.oracle_checkpoint:
         print("Error: --oracle_checkpoint is required for evaluation")
@@ -239,7 +239,7 @@ def main():
     if not args.data_path:
         print("Error: --data_path is required for evaluation")
         return 1
-    
+
     # Load config if not provided
     if not args.config:
         try:
@@ -254,10 +254,10 @@ def main():
         except Exception as e:
             print(f"Error loading default config: {e}")
             return 1
-    
+
     config = OmegaConf.load(args.config)
     evaluator = PromoterEvaluator()
-    
+
     # Run evaluation (always includes sampling + SP-MSE computation)
     metrics = evaluator.evaluate_with_sampling(
         checkpoint_path=args.checkpoint,
@@ -268,16 +268,21 @@ def main():
         steps=args.steps,
         batch_size=args.batch_size,
         architecture=args.architecture,
+        gibbs=args.gibbs,
+        csteps=args.csteps,
+        cdiv=args.cdiv,
+        ctype=args.ctype,
+        thr=args.thr,
         show_progress=args.show_progress,
         save_sequences=getattr(args, 'save_sequences', False)
     )
-    
+
     # Print and save results
     evaluator.print_results(metrics)
-    
+
     output_path = args.output or f"evaluation_results/promoter_{args.architecture}_{args.split}_results.json"
     evaluator.save_results(metrics, output_path)
-    
+
     print(f"\n✓ Promoter evaluation completed successfully!")
     return 0
 

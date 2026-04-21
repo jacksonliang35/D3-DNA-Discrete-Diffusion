@@ -172,7 +172,8 @@ def get_pc_sampler(graph, noise, batch_dims, predictor, steps, denoise=True, eps
         if saved_elements and 'sequence' in saved_elements:
             saved_elements['sequence'].append(x.clone())
 
-        for i in range(steps):
+        from tqdm import tqdm
+        for i in tqdm(range(steps), total=steps, desc="Diffusion Steps"):
             t = timesteps[i] * torch.ones(x.shape[0], 1, device=device)
             x = projector(x)
             # Create save_elements dict excluding 'sequence' (we'll save it separately after update)

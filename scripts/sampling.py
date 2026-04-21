@@ -302,7 +302,7 @@ def get_gibbs_sampler(graph, noise, batch_dims, predictor, steps, denoise=True, 
             # denoising step
             x = proj_fun(x)
             t = timesteps[-1] * torch.ones(x.shape[0], 1, device=device)
-            x = denoiser.update_fn(score_fn, x, t)
+            x = denoiser.update_fn(score_fn, x, labels, t)
 
         return x
 

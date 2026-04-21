@@ -69,7 +69,7 @@ class PromoterEvaluator(BaseEvaluator):
         elif split == 'val':
             dataset = val_ds
         elif split == 'test':
-            dataset = test_ds[:test_ds.shape[0]//30]
+            dataset = test_ds
         else:
             raise ValueError(f"Unknown split: {split}")
             

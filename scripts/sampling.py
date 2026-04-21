@@ -278,13 +278,12 @@ def get_gibbs_sampler(graph, noise, batch_dims, predictor, steps, denoise=True, 
     predictor = get_predictor(predictor)(graph, noise)
     corrector = GibbsCorrector(graph, noise)
     denoiser = Denoiser(graph, noise)
-    num_steps = steps * (cdiv // (cdiv+1))   # in order to match the NFE
+    num_steps = steps * cdiv // (cdiv+1)   # in order to match the NFE
 
     @torch.no_grad()
     def gibbs_sampler(model, labels):
         score_fn = get_score_fn(model, train=False, sampling=True)
         x = graph.sample_limit(*batch_dims).to(device)
-        print(num_steps, cdiv)
         timesteps = torch.linspace(1, eps, num_steps + 1, device=device)
         dt = (1 - eps) / num_steps
 

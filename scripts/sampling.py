@@ -281,7 +281,7 @@ def get_gibbs_sampler(graph, noise, batch_dims, predictor, steps, denoise=True, 
 
     @torch.no_grad()
     def gibbs_sampler(model, labels):
-        score_fn = mutils.get_score_fn(model, train=False, sampling=True)
+        score_fn = get_score_fn(model, train=False, sampling=True)
         x = graph.sample_limit(*batch_dims).to(device)
 
         num_steps = steps * (cdiv // (cdiv+1))   # in order to match the NFE
